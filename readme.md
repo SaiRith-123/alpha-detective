@@ -27,6 +27,8 @@ Instead of relying exclusively on semantic vector search, Alpha-Detective combin
 
 This hybrid architecture allows the system to handle both **semantic questions** and **exact financial terminology, names, and keywords** more effectively than relying on a single retrieval method.
 
+*DATA SET: https://www.kaggle.com/datasets/rafifellert/2020-2026-transcripts-of-earning-calls*
+
 ---
 
 # 🏗️ Architecture
