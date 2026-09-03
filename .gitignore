@@ -1,0 +1,21 @@
+# Virtual Environment
+.venv/
+venv/
+
+# Local Databases
+chroma_db/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Environment variables (CRITICAL: Never upload your API key!)
+.env
+
+# Temp files
+temp_uploaded_data.csv
+
+# Large datasets (optional: keep earnings_transcripts.csv out if it's too big)
+NLP_Dataset/
+
+*.csv
