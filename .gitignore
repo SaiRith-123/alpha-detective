@@ -14,6 +14,8 @@ __pycache__/
 
 # Temp files
 temp_uploaded_data.csv
+eval/golden.jsonl
+eval/golden.auto.jsonl
 
 # Large datasets (optional: keep earnings_transcripts.csv out if it's too big)
 NLP_Dataset/

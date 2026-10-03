@@ -15,7 +15,7 @@
 
 ## 📌 Overview
 
-**Alpha-Detective** is a production-oriented **Retrieval-Augmented Generation (RAG)** application designed for querying corporate earnings call transcripts.
+**Alpha-Detective** is a prototype **Retrieval-Augmented Generation (RAG)** application for querying corporate earnings call transcripts.
 
 Instead of relying exclusively on semantic vector search, Alpha-Detective combines two complementary retrieval strategies:
 
@@ -37,7 +37,7 @@ This hybrid architecture allows the system to handle both **semantic questions**
                   ┌─────────────────────────┐
                   │ Earnings Call Dataset   │
                   │ 1,185 Transcripts       │
-                  │ 51 Companies            │
+                  │ 50 Companies            │
                   └────────────┬────────────┘
                                │
                                ▼
@@ -194,7 +194,7 @@ This makes it possible to inspect **which documents influenced the answer** inst
 
 The project is designed around an earnings-call transcript dataset containing:
 
-* **51 companies**
+* **50 companies**
 * **1,185 quarterly transcripts**
 * Company names
 * Stock tickers
@@ -549,7 +549,7 @@ The ChromaDB vector index is persisted locally:
 ./chroma_db
 ```
 
-This allows the application to reuse the generated vector database instead of rebuilding it every time.
+Uploaded node content and metadata determine a fingerprinted Chroma collection. Re-indexing the same data reuses its stored vectors instead of embedding them again; changed data gets its own collection. The sparse BM25 retriever is rebuilt in memory from the uploaded nodes each time, since BM25 is not persisted.
 
 To completely rebuild the index:
 
@@ -558,6 +558,75 @@ Delete the chroma_db/ directory
 ```
 
 and run the indexing process again.
+
+---
+
+# 📊 Retrieval Evaluation
+
+Dataset: 1,185 transcript rows across 50 companies; human-reviewed questions: 0; embedding model: `text-embedding-3-small`. The current draft set is LLM-drafted. Automated screening can mark rows ready after exact-chunk validation, but that is not human review.
+
+A preliminary `eval/results.csv` exists locally, but it contains only one machine-screened question and is not a meaningful retrieval comparison. The BGE reranker was unavailable during that run and fell back to the non-reranked path. No human-reviewed evaluation results or supported performance conclusions are available.
+
+Configured ablation ladder:
+
+| Configuration | Status |
+|---|---|
+| Dense-only, k=5 | Not measured |
+| BM25-only, k=5 | Not measured |
+| Hybrid, k=5 | Not measured |
+| Hybrid wide fusion (20 → 20 → 6) | Not measured |
+| Hybrid + filter | Not measured |
+| Hybrid + filter + BGE rerank | Not measured |
+| Hybrid + filter + FlashRank rerank | Not measured |
+
+## Known limitations
+
+* Aggregate questions may need evidence from multiple transcript chunks; the current exact-snippet scoring does not evaluate answer synthesis across chunks.
+* There are no reviewed evaluation questions yet. Until a question set is assembled, no retrieval comparison can be made; even after that, small evaluation sets make small metric differences noisy.
+
+Draft reviewable questions from the transcript dataset:
+
+```text
+python -m eval.make_golden_draft
+```
+
+To machine-screen drafts locally, set `OPENAI_API_KEY` in PowerShell and run:
+
+```powershell
+$env:OPENAI_API_KEY = "your-key"
+.\.venv\Scripts\python.exe -m eval.auto_review_golden --run-eval
+```
+
+This writes a separate `eval/golden.auto.jsonl`, preserving the original
+`golden.jsonl`. It marks a row ready only when the LLM response passes checks
+for metadata, type, long verbatim question overlap, exact evidence text, and
+evidence occurring in exactly one transcript chunk. These checks cannot prove
+that a question is factually well-posed. Automated screening is not equivalent
+to hand review; inspect the generated set before treating it as a
+human-validated benchmark. Rows that fail checks remain flagged for review.
+
+The `--run-eval` option runs the dense-only, BM25-only, hybrid k=5 baseline,
+wider-fusion, filtering, and reranking ablations using the machine-screened
+output. To run evaluation separately:
+
+```text
+python -m eval.run_eval --golden eval/golden.auto.jsonl
+```
+
+Evaluation reads the key from the environment, reuses the fingerprinted Chroma
+index when available, skips rows still requiring review, and writes measured
+aggregate and per-type metrics to `eval/results.csv`. The harness includes
+filtered hybrid runs with both the BGE and FlashRank rerankers.
+
+Optional rerankers can be installed separately:
+
+```text
+pip install -r requirements-rerank.txt
+```
+
+This installs the BGE SentenceTransformer integration and the FlashRank CPU
+ONNX backend. If a selected backend is not installed, the app warns and
+continues without reranking.
 
 ---
 
@@ -728,4 +797,4 @@ Machine Learning & AI Enthusiast
 
 Consider giving the repository a ⭐ and exploring the implementation.
 
-Built to demonstrate how **hybrid information retrieval can make financial-domain RAG systems more transparent, searchable, and reliable.**
+Built to demonstrate how **hybrid information retrieval can make financial-domain RAG systems more transparent and searchable. Generated answers should be checked against their cited transcript sources.**

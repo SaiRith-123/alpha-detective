@@ -6,10 +6,14 @@ A hybrid-search RAG chatbot for earnings call transcripts.
 
 from __future__ import annotations
 import time
-import os
 import streamlit as st
-import pandas as pd
-from alpha_detective import build_hybrid_retriever, load_data, query_system
+from alpha_detective import RetrievalConfig, build_hybrid_retriever, load_data, query_system
+
+APP_RETRIEVAL_CONFIG = RetrievalConfig(
+    retrieve_k=5,
+    fused_k=5,
+    final_k=5,
+)
 
 st.set_page_config(page_title="Alpha-Detective 🕵️", page_icon="🕵️", layout="wide")
 
@@ -22,12 +26,9 @@ with st.sidebar:
     st.title("🕵️ Alpha-Detective")
     st.caption("Hybrid Search RAG — Earnings Call Analysis")
 
-    # 1. Secure API Key Input (CRITICAL FOR GITHUB)
     openai_api_key = st.text_input("Enter your OpenAI API Key", type="password", 
                                    help="Get your key at platform.openai.com. Your key is never stored.")
-    if openai_api_key:
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-    else:
+    if not openai_api_key:
         st.warning("Please enter your OpenAI API key to continue.")
         st.stop() # This stops the app from running until they paste a key
 
@@ -42,28 +43,14 @@ with st.sidebar:
         if st.button("Load & Index Uploaded Data", type="primary", use_container_width=True):
             with st.spinner(f"⏳ Loading {len(uploaded_files)} files and building the hybrid index..."):
                 try:
-                    all_data = []
-                    for uploaded_file in uploaded_files:
-                        if uploaded_file.name.endswith('.txt'):
-                            text_content = uploaded_file.read().decode('utf-8', errors='ignore')
-                            company_name = uploaded_file.name.replace('.txt', '')
-                            all_data.append({
-                                "Ticker": company_name,
-                                "Company_Name": company_name,
-                                "Quarter": "N/A",
-                                "Text": text_content
-                            })
-                        elif uploaded_file.name.endswith('.csv'):
-                            df_temp = pd.read_csv(uploaded_file)
-                            if len(df_temp.columns) >= 4:
-                                df_temp.columns = ['Ticker', 'Company_Name', 'Quarter', 'Text'] + list(df_temp.columns[4:])
-                            all_data.extend(df_temp.to_dict('records'))
-                    
-                    combined_df = pd.DataFrame(all_data)
                     t0 = time.time()
-                    docs = load_data(combined_df)
+                    docs = load_data(uploaded_files)
                     
-                    st.session_state.retriever = build_hybrid_retriever(docs, reset_collection=True)
+                    st.session_state.retriever = build_hybrid_retriever(
+                        docs,
+                        api_key=openai_api_key,
+                        config=APP_RETRIEVAL_CONFIG,
+                    )
                     st.session_state.data_loaded = True
                     st.success(f"✅ Indexed {len(docs):,} chunks in {time.time() - t0:.1f}s. Hybrid retriever is live.")
                 except Exception as exc:
@@ -83,17 +70,38 @@ if query:
         try:
             with st.spinner("🕵️ Investigating..."):
                 t0 = time.time()
-                answer, nodes = query_system(query, st.session_state.retriever)  # type: ignore
+                retriever = st.session_state.retriever
+                if retriever is None:
+                    raise RuntimeError("Load and index transcripts before querying.")
+                answer, nodes = query_system(
+                    query,
+                    retriever,
+                    api_key=openai_api_key,
+                    config=APP_RETRIEVAL_CONFIG,
+                )
             elapsed = time.time() - t0
 
+            if retriever.rerank_warning:
+                st.warning(retriever.rerank_warning)
+
             st.markdown("### 🧠 Answer")
-            st.markdown(f"<div style='background:#0e1117;border:1px solid #2a6df4;border-left:6px solid #2a6df4;border-radius:10px;padding:18px;font-size:1.05rem;line-height:1.6'>{answer}</div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown(answer)
             st.caption(f"Generated in {elapsed:.1f}s · top-{len(nodes)} fused sources")
 
             with st.expander("📚 Retrieved Context Sources", expanded=False):
                 st.caption("Score = **RRF score**. Higher is better.")
                 if nodes:
-                    rows = [{"Company Name": n.node.metadata.get("Company_Name", "?"), "Ticker": n.node.metadata.get("Ticker", "?"), "Quarter": n.node.metadata.get("Quarter", "?"), "RRF Score": f"{n.score:.4f}"} for n in nodes]
+                    rows = [
+                        {
+                            "Company Name": n.node.metadata.get("Company_Name", "?"),
+                            "Ticker": n.node.metadata.get("Ticker", "?"),
+                            "Quarter": n.node.metadata.get("Quarter", "?"),
+                            "RRF Score": n.node.metadata.get("rrf_score", n.score),
+                            "Rerank Score": n.node.metadata.get("rerank_score"),
+                        }
+                        for n in nodes
+                    ]
                     st.dataframe(rows, use_container_width=True, hide_index=True)
                     with st.expander("Show source snippets"):
                         for i, n in enumerate(nodes, 1):
