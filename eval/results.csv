@@ -1,0 +1,15 @@
+config,question_type,questions,hit@1,hit@3,hit@5,mrr,p50_latency_ms
+dense-only k=5,all,1,0.0,0.0,0.0,0.0,299.8251999961212
+dense-only k=5,exact,1,0.0,0.0,0.0,0.0,299.8251999961212
+bm25-only k=5,all,1,0.0,1.0,1.0,0.5,5.757800012361258
+bm25-only k=5,exact,1,0.0,1.0,1.0,0.5,5.757800012361258
+hybrid k=5 baseline,all,1,0.0,0.0,1.0,0.2,607.0386999635957
+hybrid k=5 baseline,exact,1,0.0,0.0,1.0,0.2,607.0386999635957
+hybrid wide (20->20->6),all,1,0.0,0.0,0.0,0.0,372.57800000952557
+hybrid wide (20->20->6),exact,1,0.0,0.0,0.0,0.0,372.57800000952557
+hybrid + filter,all,1,0.0,0.0,0.0,0.0,857.9483000212349
+hybrid + filter,exact,1,0.0,0.0,0.0,0.0,857.9483000212349
+hybrid + filter + rerank (bge) [rerank unavailable; fallback used],all,1,0.0,0.0,0.0,0.0,600.2767999889329
+hybrid + filter + rerank (bge) [rerank unavailable; fallback used],exact,1,0.0,0.0,0.0,0.0,600.2767999889329
+hybrid + filter + rerank (flashrank),all,1,0.0,1.0,1.0,0.5,3370.8428000099957
+hybrid + filter + rerank (flashrank),exact,1,0.0,1.0,1.0,0.5,3370.8428000099957
